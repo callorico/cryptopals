@@ -100,7 +100,7 @@ def is_ecb(oracle, block_size):
     # a rule of thumb.
     blocks = block_histogram(ciphertext, block_size)
     _, count = blocks.most_common(1)[0]
-    return count >= (repeated_blocks * 0.8)
+    return count >= (repeated_blocks * 0.9)
 
 def block_histogram(ciphertext, block_size):
     blocks = [
@@ -109,13 +109,45 @@ def block_histogram(ciphertext, block_size):
     ]
     return Counter(blocks)
 
+def find_prefix_length(oracle, block_size):
+    """Return a tuple where the first element is the block-aligned length of
+    the oracle's random prefix and the second element is the number of padding
+    bytes that need to be added to the last block in the random prefix to block
+    align it.
+    """
+
+    # Pass N repeated blocks of the same content to the oracle and look for
+    # N consecutive repeated blocks in the ciphertext. First prefix the N
+    # blocks with 0-bytes, if N matches are not found, then try prefixing with
+    # 1-byte, and so on until all N-1 possible padding bytes are tried.
+    repeated_blocks = 5
+    for padding in range(0, block_size):
+        content_length = padding + (block_size * repeated_blocks)
+        result = oracle('A' * content_length)
+        repeats = 0
+        start_position = 0
+        prev_block = None
+        for start in range(0, len(result), block_size):
+            block = result[start:start + block_size]
+            if block == prev_block:
+                repeats += 1
+                if repeats == repeated_blocks:
+                    break
+            else:
+                start_position = start
+                repeats = 1
+
+            prev_block = block
+
+        if repeats == repeated_blocks:
+            return start_position, padding
+
+    raise ValueError('Unable to determine prefix length')
+
 def discover_block_size(oracle):
-    last_result = ''
-    for i in range(1, 128):
-        result = oracle('A' * i)[:i]
-        if last_result and result.startswith(last_result):
-            return len(last_result)
-        last_result = result
-
-    raise ValueError('Unknown block size')
-
+    original_length = len(oracle(''))
+    for i in range(1, 256):
+        new_length = len(oracle('A' * i))
+        if new_length > original_length:
+            diff = new_length - original_length
+            return diff

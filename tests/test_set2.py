@@ -9,7 +9,7 @@ from convert import base64_to_bytes
 from crypto import (pkcs_7, cbc_decrypt, cbc_encrypt, ecb_encrypt, ecb_decrypt,
                     encryption_key, iv, random_padding, strip_pkcs_7,
                     PaddingError)
-from crack import is_ecb, discover_block_size
+from crack import is_ecb, discover_block_size, find_prefix_length
 from utils import read
 
 def multimode_oracle(plaintext, mode):
@@ -24,10 +24,19 @@ def multimode_oracle(plaintext, mode):
 
     raise ValueError('Unknown mode')
 
-def ecb_oracle(plaintext, key='YELLOW SUBMARINE'):
+def ecb_oracle(plaintext, key='YELLOW SUBMARINE', prefix=''):
     secret = base64_to_bytes('Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK')
-    full = plaintext + secret
+    full = prefix + plaintext + secret
     return ecb_encrypt(full, key)
+
+def prefix_stripping_oracle(oracle, block_size):
+    start, padding_length = find_prefix_length(oracle, block_size)
+    padding = 'A' * padding_length
+
+    def wrapped_oracle(content):
+        return oracle(padding + content)[start:]
+
+    return wrapped_oracle
 
 def decrypt_ecb_with_oracle(oracle, block_size):
     plaintext = 'A' * block_size
@@ -126,7 +135,7 @@ class TestSet2(unittest.TestCase):
         self.assertTrue(is_ecb(ecb_oracle, block_size))
 
         plaintext = decrypt_ecb_with_oracle(ecb_oracle, block_size)
-        # print plaintezt
+        # print plaintext
         self.assertIn(
             'No, I just drove by',
             plaintext
@@ -140,20 +149,40 @@ class TestSet2(unittest.TestCase):
         # email=AAAAAAAAAAadmin&uid=10&role=user
         key = encryption_key()
         ciphertext = encrypt_profile('AAAAAAAAAAadmin', key)
-        admin_block = ciphertext[16:]
+        admin_block = ciphertext[16:32]
 
         # print ecb_decrypt(admin_block, key)
         # Provide an email address that causes a cipher block to end with role=
         # 0               1               2               3
         # email=ryan%2BAAAAAAAAAA%40gmail.com&uid=10&role=user
         ciphertext = encrypt_profile('ryan+AAAAAAAAAA@gmail.com', key)
-        prefix = ciphertext[:(16 * 3)]
+        prefix_length = 16 * 3
+        prefix = ciphertext[:prefix_length]
+        suffix = ciphertext[prefix_length:]
 
         # Then paste the admin block to the end of that
-        manipulated = prefix + admin_block
-
+        # Tack on the original last block to prevent two role qs args from
+        # being created.
+        manipulated = prefix + admin_block + suffix
         profile = decrypt_profile(manipulated, key)
+
         self.assertIn('admin', profile['role'])
+
+    def test_challenge14(self):
+        prefix = random_padding(min=0, max=100)
+        print 'Random prefix length: {}'.format(len(prefix))
+        oracle = lambda s: ecb_oracle(s, prefix=prefix)
+        block_size = discover_block_size(oracle)
+        self.assertEqual(16, block_size)
+        self.assertTrue(is_ecb(oracle, block_size))
+
+        wrapped_oracle = prefix_stripping_oracle(oracle, block_size)
+        plaintext = decrypt_ecb_with_oracle(wrapped_oracle, block_size)
+        # print plaintext
+        self.assertIn(
+            'No, I just drove by',
+            plaintext
+        )
 
     def test_challenge15(self):
         self.assertEquals(
