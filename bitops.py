@@ -29,3 +29,14 @@ def block_distance(size, ciphertext):
     normalized_distance = average_distance / size
 
     return (normalized_distance, size)
+
+def twiddle_bits(mask, actual_char, target_char):
+    """Flips the corresponding bit in the mask whenever the actual and target
+    bits differ
+    """
+    differing_bits = ord(actual_char) ^ ord(target_char)
+
+    mask_bits_to_keep = (ord(mask) & ~differing_bits)
+    mask_bits_to_flip = (~ord(mask) & differing_bits)
+
+    return chr(mask_bits_to_keep | mask_bits_to_flip)

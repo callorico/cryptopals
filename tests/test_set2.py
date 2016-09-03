@@ -9,6 +9,7 @@ from convert import base64_to_bytes
 from crypto import (pkcs_7, cbc_decrypt, cbc_encrypt, ecb_encrypt, ecb_decrypt,
                     encryption_key, iv, random_padding, strip_pkcs_7,
                     PaddingError)
+from bitops import twiddle_bits
 from crack import is_ecb, discover_block_size, find_prefix_length
 from utils import read
 
@@ -87,6 +88,19 @@ def encrypt_profile(email, key):
 def decrypt_profile(ciphertext, key):
     qs = ecb_decrypt(ciphertext, key)
     return urlparse.parse_qs(qs)
+
+def encrypt_kvps(content, key, iv):
+    full_content = (
+        'comment1=cooking%20MCs;userdata='
+        + urllib.quote(content)
+        + ';comment2=%20like%20a%20pound%20of%20bacon'
+    )
+
+    return cbc_encrypt(full_content, key, iv)
+
+def is_admin(ciphertext, key, iv):
+    decrypted = cbc_decrypt(ciphertext, key, iv)
+    return ';admin=true;' in decrypted
 
 class TestSet2(unittest.TestCase):
 
@@ -170,7 +184,6 @@ class TestSet2(unittest.TestCase):
 
     def test_challenge14(self):
         prefix = random_padding(min=0, max=100)
-        print 'Random prefix length: {}'.format(len(prefix))
         oracle = lambda s: ecb_oracle(s, prefix=prefix)
         block_size = discover_block_size(oracle)
         self.assertEqual(16, block_size)
@@ -195,3 +208,35 @@ class TestSet2(unittest.TestCase):
 
         with self.assertRaises(PaddingError):
             strip_pkcs_7('ICE ICE BABY\x01\x02\x03\x04')
+
+    def test_challenge16(self):
+        key = encryption_key()
+        init_vector = iv()
+        ciphertext = encrypt_kvps('admin=true', key, init_vector)
+        self.assertFalse(
+            is_admin(ciphertext, key, init_vector),
+            'Should have escaped the ='
+        )
+
+        # 0               1               2               3               4
+        # comment1=cooking%20MCs;userdata=true;comment2=%20like%20a%20pound%20of%20bacon
+        # comment1=cooking%20MCs;us;admin=true;comment2=%20like%20a%20pound%20of%20bacon
+        ciphertext = encrypt_kvps('true', key, init_vector)
+
+        # Block 0 ciphertext is XOR'ed against the decryptor output of block 1
+        # to produce the plaintext output. Twiddling a bit in the block 0
+        # ciphertext will invert the corresponding bit in the block 1 plaintext
+        combined = zip(
+            ciphertext[:16],
+            '%20MCs;userdata=',
+            '%20MCs;us;admin='
+        )
+
+        twiddled = ''.join(
+            twiddle_bits(iv_byte, actual_char, target_char)
+            for iv_byte, actual_char, target_char in combined
+        )
+
+        ciphertext = twiddled + ciphertext[16:]
+
+        self.assertTrue(is_admin(ciphertext, key, init_vector))
