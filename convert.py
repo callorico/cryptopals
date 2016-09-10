@@ -23,14 +23,29 @@ def bytes_to_base64(rawbytes):
     encoded = ''
     mask = 0b000000000000000000111111
     for i in range(0, len(rawbytes), 3):
-        numeric = (ord(rawbytes[i]) << 16) | (ord(rawbytes[i + 1]) << 8) | ord(rawbytes[i + 2])
+        numeric = (ord(rawbytes[i]) << 16)
+        if (i + 1) < len(rawbytes):
+            numeric |= (ord(rawbytes[i + 1]) << 8)
+
+        if (i + 2) < len(rawbytes):
+            numeric |= ord(rawbytes[i + 2])
 
         encoded += b64_alphabet[(numeric >> 18 & mask)]
         encoded += b64_alphabet[(numeric >> 12 & mask)]
-        encoded += b64_alphabet[(numeric >> 6 & mask)]
-        encoded += b64_alphabet[(numeric & mask)]
 
-    return encoded
+        if (i + 1) < len(rawbytes):
+            encoded += b64_alphabet[(numeric >> 6 & mask)]
+
+        if (i + 2) < len(rawbytes):
+            encoded += b64_alphabet[(numeric & mask)]
+
+    remainder = len(rawbytes) % 3
+    if remainder:
+        padding = '=' * (3 - remainder)
+    else:
+        padding = ''
+
+    return encoded + padding
 
 def base64_to_bytes(b64chars):
     encoded = ''
@@ -46,7 +61,12 @@ def base64_to_bytes(b64chars):
         encoded += chr((numeric >> 8) & 0xff)
         encoded += chr(numeric & 0xff)
 
-    return encoded
+    if b64chars.endswith('=='):
+        return encoded[:-2]
+    elif b64chars.endswith('='):
+        return encoded[:-1]
+    else:
+        return encoded
 
 def base64_to_int(b64char, allow_padding_char=False):
     if allow_padding_char and b64char == '=':
