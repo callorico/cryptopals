@@ -40,3 +40,17 @@ def twiddle_bits(mask, actual_char, target_char):
     mask_bits_to_flip = (~ord(mask) & differing_bits)
 
     return chr(mask_bits_to_keep | mask_bits_to_flip)
+
+def to_bytes(number, length):
+    """Returns a bytestring with the little-endian representation of the
+    specified number that is zero-padded to the desired length.
+    """
+    bytestring = ''
+    quotient = number
+    while quotient:
+        quotient, remainder = divmod(quotient, 256)
+        bytestring += chr(remainder)
+
+    bytestring += '\x00' * (length - (len(bytestring)))
+
+    return bytestring

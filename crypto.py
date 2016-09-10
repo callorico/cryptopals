@@ -1,8 +1,9 @@
 import os
+import itertools
 import random
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
-from bitops import xor
+from bitops import xor, to_bytes
 
 
 class PaddingError(Exception):
@@ -85,3 +86,19 @@ def iv():
 def random_padding(min=5, max=10):
     length = random.randint(min, max)
     return os.urandom(length)
+
+def ctr_convert(text, key, nonce):
+    blocks = (text[s:(s+16)] for s in range(0, len(text), 16))
+
+    return ''.join(
+        xor(a, b) for a, b in zip(blocks, _ctr_keystream(key, nonce))
+    )
+
+ctr_encrypt = ctr_convert
+ctr_decrypt = ctr_convert
+
+def _ctr_keystream(key, nonce):
+    for counter in itertools.count():
+        plaintext = nonce + to_bytes(counter, 8)
+        yield ecb_encrypt(plaintext, key)
+

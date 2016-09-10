@@ -3,7 +3,7 @@ import random
 from collections import OrderedDict
 from convert import base64_to_bytes
 from crypto import (cbc_decrypt, cbc_encrypt, encryption_key, iv, PaddingError,
-                    strip_pkcs_7)
+                    strip_pkcs_7, ctr_decrypt, ctr_encrypt)
 
 secret_messages = [
     base64_to_bytes(c)
@@ -86,3 +86,17 @@ class TestSet3(unittest.TestCase):
         plaintext = strip_pkcs_7(plaintext)
         # print plaintext
         self.assertIn(plaintext, secret_messages)
+
+    def test_challenge18(self):
+        ciphertext = base64_to_bytes('L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ==')
+        nonce = '\x00' * 8
+        plaintext = ctr_decrypt(ciphertext, 'YELLOW SUBMARINE', nonce)
+        self.assertEqual(
+            'Yo, VIP Let\'s kick it Ice, Ice, baby Ice, Ice, baby ',
+            plaintext
+        )
+
+        plaintext = 'the quick brown fox jumped over the lazy dog.'
+        key = encryption_key()
+        ciphertext = ctr_encrypt(plaintext, key, nonce)
+        self.assertEqual(plaintext, ctr_decrypt(ciphertext, key, nonce))
