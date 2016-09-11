@@ -1,7 +1,11 @@
 import unittest
 import random
-from collections import OrderedDict
-from convert import base64_to_bytes
+import crack
+import bitops
+import itertools
+import utils
+from collections import OrderedDict, Counter, defaultdict
+from convert import base64_to_bytes, bytes_to_hex
 from crypto import (cbc_decrypt, cbc_encrypt, encryption_key, iv, PaddingError,
                     strip_pkcs_7, ctr_decrypt, ctr_encrypt)
 
@@ -100,3 +104,98 @@ class TestSet3(unittest.TestCase):
         key = encryption_key()
         ciphertext = ctr_encrypt(plaintext, key, nonce)
         self.assertEqual(plaintext, ctr_decrypt(ciphertext, key, nonce))
+
+    def test_challenge19(self):
+        plaintexts = [
+            base64_to_bytes(m)
+            for m in [
+                'SSBoYXZlIG1ldCB0aGVtIGF0IGNsb3NlIG9mIGRheQ==',
+                'Q29taW5nIHdpdGggdml2aWQgZmFjZXM=',
+                'RnJvbSBjb3VudGVyIG9yIGRlc2sgYW1vbmcgZ3JleQ==',
+                'RWlnaHRlZW50aC1jZW50dXJ5IGhvdXNlcy4=',
+                'SSBoYXZlIHBhc3NlZCB3aXRoIGEgbm9kIG9mIHRoZSBoZWFk',
+                'T3IgcG9saXRlIG1lYW5pbmdsZXNzIHdvcmRzLA==',
+                'T3IgaGF2ZSBsaW5nZXJlZCBhd2hpbGUgYW5kIHNhaWQ=',
+                'UG9saXRlIG1lYW5pbmdsZXNzIHdvcmRzLA==',
+                'QW5kIHRob3VnaHQgYmVmb3JlIEkgaGFkIGRvbmU=',
+                'T2YgYSBtb2NraW5nIHRhbGUgb3IgYSBnaWJl',
+                'VG8gcGxlYXNlIGEgY29tcGFuaW9u',
+                'QXJvdW5kIHRoZSBmaXJlIGF0IHRoZSBjbHViLA==',
+                'QmVpbmcgY2VydGFpbiB0aGF0IHRoZXkgYW5kIEk=',
+                'QnV0IGxpdmVkIHdoZXJlIG1vdGxleSBpcyB3b3JuOg==',
+                'QWxsIGNoYW5nZWQsIGNoYW5nZWQgdXR0ZXJseTo=',
+                'QSB0ZXJyaWJsZSBiZWF1dHkgaXMgYm9ybi4=',
+                'VGhhdCB3b21hbidzIGRheXMgd2VyZSBzcGVudA==',
+                'SW4gaWdub3JhbnQgZ29vZCB3aWxsLA==',
+                'SGVyIG5pZ2h0cyBpbiBhcmd1bWVudA==',
+                'VW50aWwgaGVyIHZvaWNlIGdyZXcgc2hyaWxsLg==',
+                'V2hhdCB2b2ljZSBtb3JlIHN3ZWV0IHRoYW4gaGVycw==',
+                'V2hlbiB5b3VuZyBhbmQgYmVhdXRpZnVsLA==',
+                'U2hlIHJvZGUgdG8gaGFycmllcnM/',
+                'VGhpcyBtYW4gaGFkIGtlcHQgYSBzY2hvb2w=',
+                'QW5kIHJvZGUgb3VyIHdpbmdlZCBob3JzZS4=',
+                'VGhpcyBvdGhlciBoaXMgaGVscGVyIGFuZCBmcmllbmQ=',
+                'V2FzIGNvbWluZyBpbnRvIGhpcyBmb3JjZTs=',
+                'SGUgbWlnaHQgaGF2ZSB3b24gZmFtZSBpbiB0aGUgZW5kLA==',
+                'U28gc2Vuc2l0aXZlIGhpcyBuYXR1cmUgc2VlbWVkLA==',
+                'U28gZGFyaW5nIGFuZCBzd2VldCBoaXMgdGhvdWdodC4=',
+                'VGhpcyBvdGhlciBtYW4gSSBoYWQgZHJlYW1lZA==',
+                'QSBkcnVua2VuLCB2YWluLWdsb3Jpb3VzIGxvdXQu',
+                'SGUgaGFkIGRvbmUgbW9zdCBiaXR0ZXIgd3Jvbmc=',
+                'VG8gc29tZSB3aG8gYXJlIG5lYXIgbXkgaGVhcnQs',
+                'WWV0IEkgbnVtYmVyIGhpbSBpbiB0aGUgc29uZzs=',
+                'SGUsIHRvbywgaGFzIHJlc2lnbmVkIGhpcyBwYXJ0',
+                'SW4gdGhlIGNhc3VhbCBjb21lZHk7',
+                'SGUsIHRvbywgaGFzIGJlZW4gY2hhbmdlZCBpbiBoaXMgdHVybiw=',
+                'VHJhbnNmb3JtZWQgdXR0ZXJseTo=',
+                'QSB0ZXJyaWJsZSBiZWF1dHkgaXMgYm9ybi4=',
+            ]
+        ]
+
+        key = encryption_key()
+        nonce = '\x00' * 8
+        ciphertexts = [
+            ctr_encrypt(m, key, nonce)
+            for m in plaintexts
+        ]
+
+        self.fail('TODO: Implement this...')
+
+    def test_challenge20(self):
+        plaintexts = [
+            base64_to_bytes(line)
+            for line in utils.readlines('20.txt')
+        ]
+
+        key = encryption_key()
+        nonce = '\0' * 8
+        ciphertexts = [
+            ctr_encrypt(m, key, nonce)
+            for m in plaintexts
+        ]
+
+        # Because of the fixed-nonce, the encrypted keystream bytes are
+        # repeated for every plaintext message.
+        #
+        # ciphertext[i] ^ keystream[i] = plaintext[i]
+        #
+        # We can create a transposed ciphertext message by concatenating
+        # ciphertext[i] from every encrypted message and then xor'ing that
+        # against a guessed keystream byte. Then we can test whether the
+        # resulting plaintext looks like english based on character
+        # distributions. If so, then we've figured out the keystream byte.
+
+        keystream = ''
+        for index in itertools.count():
+            transposed = ''.join(m[index:index+1] for m in ciphertexts)
+            if not transposed:
+                break
+
+            score, _, key = crack.find_best_single_byte_key(
+                transposed,
+            )
+            # print 'Best score for index {}: {}'.format(index, score)
+            keystream += key[0]
+
+        for m in ciphertexts:
+            print bitops.xor(m, keystream)

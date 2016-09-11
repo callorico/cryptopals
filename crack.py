@@ -34,36 +34,65 @@ english_freq_vector = {
     'Z': 0.05128469,
 }
 
+first_letter_english_freq_vector = {
+    'A': 11.602,
+    'B': 4.702,
+    'C': 3.511,
+    'D': 2.670,
+    'E': 2.007,
+    'F': 3.779,
+    'G': 1.950,
+    'H': 7.232,
+    'I': 6.286,
+    'J': 0.597,
+    'K': 0.590,
+    'L': 2.705,
+    'M': 4.383,
+    'N': 2.365,
+    'O': 6.264,
+    'P': 2.545,
+    'Q': 0.173,
+    'R': 1.653,
+    'S': 7.755,
+    'T': 16.671,
+    'U': 1.487,
+    'V': 0.649,
+    'W': 6.753,
+    'X': 0.017,
+    'Y': 1.620,
+    'Z': 0.034,
+}
+
 def vector_length(count_dict):
     return math.sqrt(sum([v * v for v in count_dict.values()]))
-
-english_freq_vector_length = vector_length(english_freq_vector)
-
 
 def single_byte_keys(length):
     for x in range(256):
         yield chr(x) * length
 
-def english_score(rawbytes):
+def english_score(rawbytes, freq_vector=None):
     if not all(c in string.printable for c in rawbytes):
         return 0.0
 
-    canonical = [
-        c.upper() for c in rawbytes if c.upper() in english_freq_vector
-    ]
+    canonical = [c.upper() for c in rawbytes]
+    if not canonical:
+        return 0.0
+
+    if freq_vector is None:
+        freq_vector = english_freq_vector
 
     counts = Counter(canonical)
-    for letter in counts:
-        counts[letter] /= float(len(canonical))
+    # for letter in counts:
+        # counts[letter] /= float(len(canonical))
 
-    # Calculate cosine against canonical english frequency vector
+    # Calculate cosine against the specified english frequency vector
     numerator = 0.0
     for letter, freq in counts.iteritems():
-        numerator += freq * english_freq_vector[letter]
+        numerator += freq * freq_vector.get(letter, 0.0)
 
-    return numerator / (english_freq_vector_length * vector_length(counts))
+    return numerator / (vector_length(freq_vector) * vector_length(counts))
 
-def find_best_single_byte_key(rawbytes):
+def find_best_single_byte_key(rawbytes, freq_vector=None):
     best_key = None
     best_translation = None
     best_score = -1.0

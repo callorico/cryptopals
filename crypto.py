@@ -100,5 +100,6 @@ ctr_decrypt = ctr_convert
 def _ctr_keystream(key, nonce):
     for counter in itertools.count():
         plaintext = nonce + to_bytes(counter, 8)
+        assert len(plaintext) == 16
         yield ecb_encrypt(plaintext, key)
 
