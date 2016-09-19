@@ -4,6 +4,7 @@ import crack
 import bitops
 import itertools
 import utils
+import string
 from collections import OrderedDict, Counter, defaultdict
 from convert import base64_to_bytes, bytes_to_hex
 from crypto import (cbc_decrypt, cbc_encrypt, encryption_key, iv, PaddingError,
@@ -135,11 +136,25 @@ class TestSet3(unittest.TestCase):
             if not transposed:
                 break
 
+            allowed_chars = None
+            if index == 0:
+                allowed_chars = string.ascii_uppercase + '"\''
+
             score, _, key = crack.find_best_single_byte_key(
                 transposed,
+                allowed_chars=allowed_chars
             )
             # print 'Best score for index {}: {}'.format(index, score)
             keystream += key[0]
 
-        for m in ciphertexts:
-            print bitops.xor(m, keystream)
+        recovered_plaintexts = [
+            bitops.xor(m, keystream) for m in ciphertexts
+        ]
+
+        # for m in recovered_plaintexts:
+        #     print m
+
+        self.assertIn(
+            '\'Cause my girl is definitely mad / \'Cause it took us too long to do this album',
+            recovered_plaintexts
+        )

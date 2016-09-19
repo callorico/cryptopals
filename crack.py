@@ -70,8 +70,11 @@ def single_byte_keys(length):
     for x in range(256):
         yield chr(x) * length
 
-def english_score(rawbytes, freq_vector=None):
-    if not all(c in string.printable for c in rawbytes):
+def english_score(rawbytes, freq_vector=None, allowed_chars=None):
+    if allowed_chars is None:
+        allowed_chars = string.printable
+
+    if not all(c in allowed_chars for c in rawbytes):
         return 0.0
 
     canonical = [c.upper() for c in rawbytes]
@@ -82,8 +85,6 @@ def english_score(rawbytes, freq_vector=None):
         freq_vector = english_freq_vector
 
     counts = Counter(canonical)
-    # for letter in counts:
-        # counts[letter] /= float(len(canonical))
 
     # Calculate cosine against the specified english frequency vector
     numerator = 0.0
@@ -92,13 +93,17 @@ def english_score(rawbytes, freq_vector=None):
 
     return numerator / (vector_length(freq_vector) * vector_length(counts))
 
-def find_best_single_byte_key(rawbytes, freq_vector=None):
+def find_best_single_byte_key(rawbytes, freq_vector=None, allowed_chars=None):
     best_key = None
     best_translation = None
     best_score = -1.0
     for key in single_byte_keys(len(rawbytes)):
         translation = xor(rawbytes, key)
-        score = english_score(translation)
+        score = english_score(
+            translation,
+            freq_vector=freq_vector,
+            allowed_chars=allowed_chars
+        )
         if score > best_score:
             best_score = score
             best_key = key
