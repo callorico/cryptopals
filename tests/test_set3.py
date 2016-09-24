@@ -1,14 +1,18 @@
 import unittest
 import random
+import time
 import crack
 import bitops
 import itertools
 import utils
 import string
+from myrandom import MT19937
 from collections import OrderedDict, Counter, defaultdict
 from convert import base64_to_bytes, bytes_to_hex
 from crypto import (cbc_decrypt, cbc_encrypt, encryption_key, iv, PaddingError,
                     strip_pkcs_7, ctr_decrypt, ctr_encrypt)
+import myrandom
+import random
 
 secret_messages = [
     base64_to_bytes(c)
@@ -41,6 +45,17 @@ def is_padding_valid(ciphertext, key, iv):
         return True
     except PaddingError:
         return False
+
+def get_random(before_seed_delay_range=(40, 1000),
+               after_seed_delay_range=(10, 30)):
+    time.sleep(random.randint(*before_seed_delay_range))
+
+    seed = int(time.time())
+    r = MT19937(seed)
+
+    time.sleep(random.randint(*after_seed_delay_range))
+
+    return r.next(), seed
 
 
 class TestSet3(unittest.TestCase):
@@ -158,3 +173,30 @@ class TestSet3(unittest.TestCase):
             '\'Cause my girl is definitely mad / \'Cause it took us too long to do this album',
             recovered_plaintexts
         )
+
+    def test_challenge21(self):
+        seed = 999
+        r = MT19937(seed)
+        values = [r.next() for _ in range(1000)]
+
+        r2 = MT19937(seed)
+        values2 = [r2.next() for _ in range(len(values))]
+
+        self.assertListEqual(values, values2)
+
+    def test_challenge22(self):
+        start = int(time.time())
+
+        rand_val, actual_seed = get_random()
+
+        end = int(time.time())
+
+        for guessed_seed in range(start, end + 1):
+            r = MT19937(guessed_seed)
+            if r.next() == rand_val:
+                break
+
+        self.assertEquals(actual_seed, guessed_seed)
+
+    def test_challenge23(self):
+        pass
