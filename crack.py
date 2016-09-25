@@ -1,5 +1,6 @@
 import string
 import math
+import itertools
 from bitops import xor
 from collections import Counter
 
@@ -185,3 +186,54 @@ def discover_block_size(oracle):
         if new_length > original_length:
             diff = new_length - original_length
             return diff
+
+def untemper(v):
+    # Undo each of the Mersenne Twister tempering operations in reverse order
+
+    # y ^ (y >> 18)
+    v = invert_right_shift(v, 18)
+
+    # # y = y ^ ((y << 15) & 0xefc60000)
+    v = invert_left_shift(v, 15, 0xefc60000)
+
+    # y = y ^ ((y << 7) & 0x9d2c5680)
+    v = invert_left_shift(v, 7, 0x9d2c5680)
+
+    # y = y ^ ((y >> 11) & 0xffffffff)
+    v = invert_right_shift(v, 11)
+
+    return v
+
+def invert_right_shift(v, bits):
+    # Recover the untempered bits (u) in chunks of len(bits) marching from
+    # left to right.
+    # The right shift sets the leftmost len(bits) to 0. This is xor'ed
+    # against the untempered value and since u ^ 0 = u, we have the leftmost
+    # len(bits). Chunk n of the untempered value can be recovered by
+    # xor'ing chunk n of the tempered value against chunk n-1 of the
+    # untempered value.
+
+    u = 0
+    max_shift = 32 - bits
+    for offset in itertools.chain(range(max_shift, 0, -bits), [0]):
+        mask = ((1 << bits) - 1) << offset
+        u |= (v ^ (u >> bits)) & mask
+
+    return u
+
+def invert_left_shift(v, bits, magic):
+    # Recover the untempered bits in chunks of len(bits) marching from
+    # right to left.
+    # The left shift sets the rightmost len(bits) to 0. Since we know the
+    # magic value, we can xor this against the tempered value to recover the
+    # rightmost chunk of the untempered value. Now, chunk n of the untempered
+    # value can be recovered by xor'ing chunk n of the tempered value against
+    # chunk n-1 of the untempered value AND'ed with chunk n-1 of the magic
+    # value.
+    u = 0
+    max_shift = 32 - bits
+    for offset in itertools.chain(range(0, max_shift, bits), [max_shift]):
+        mask = ((1 << bits) - 1) << offset
+        u |= (v ^ ((u << bits) & magic)) & mask
+
+    return u

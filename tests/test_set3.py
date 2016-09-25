@@ -199,4 +199,18 @@ class TestSet3(unittest.TestCase):
         self.assertEquals(actual_seed, guessed_seed)
 
     def test_challenge23(self):
-        pass
+        r = MT19937(int(time.time()))
+        vals = [r.next() for _ in range(624)]
+
+        state = [crack.untemper(v) for v in vals]
+        cloned = MT19937(0)
+        cloned._mt = state
+        cloned._index = len(state)
+
+        # The cloned random number generator should now produce the
+        # exact same sequence of values as the original
+        vals = [r.next() for _ in range(1000)]
+        cloned_vals = [cloned.next() for _ in range(1000)]
+
+        self.assertListEqual(vals, cloned_vals)
+
