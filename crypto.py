@@ -1,5 +1,6 @@
 import os
 import itertools
+import myrandom
 import random
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
@@ -103,3 +104,13 @@ def _ctr_keystream(key, nonce):
         assert len(plaintext) == 16
         yield ecb_encrypt(plaintext, key)
 
+def twister_convert(text, key):
+    r = myrandom.MT19937(key & 0xffff)
+    keystream = (chr(r.next() & 0xff) for _ in itertools.count())
+
+    return ''.join(
+        xor(a, b) for a, b in zip(text, keystream)
+    )
+
+twister_encrypt = twister_convert
+twister_decrypt = twister_convert

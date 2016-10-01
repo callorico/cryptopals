@@ -10,7 +10,8 @@ from myrandom import MT19937
 from collections import OrderedDict, Counter, defaultdict
 from convert import base64_to_bytes, bytes_to_hex
 from crypto import (cbc_decrypt, cbc_encrypt, encryption_key, iv, PaddingError,
-                    strip_pkcs_7, ctr_decrypt, ctr_encrypt)
+                    strip_pkcs_7, ctr_decrypt, ctr_encrypt, twister_encrypt,
+                    twister_decrypt, random_padding)
 import myrandom
 import random
 
@@ -56,6 +57,13 @@ def get_random(before_seed_delay_range=(40, 1000),
     time.sleep(random.randint(*after_seed_delay_range))
 
     return r.next(), seed
+
+def password_reset_token():
+    token, _ = get_random(
+        before_seed_delay_range=(1, 3),
+        after_seed_delay_range=(1, 3)
+    )
+    return hex(token)
 
 
 class TestSet3(unittest.TestCase):
@@ -214,3 +222,43 @@ class TestSet3(unittest.TestCase):
 
         self.assertListEqual(vals, cloned_vals)
 
+    def test_challenge24(self):
+        plaintext = 'the quick brown fox jumped over the lazy dog'
+        key = 0xabcd
+        ciphertext = twister_encrypt(plaintext, key)
+        self.assertEqual(len(plaintext), len(ciphertext))
+        self.assertNotEqual(plaintext, ciphertext)
+
+        self.assertEqual(plaintext, twister_decrypt(ciphertext, key))
+
+        known_plaintext = 'A' * 14
+        padded_plaintext = random_padding() + known_plaintext
+        ciphertext = twister_encrypt(padded_plaintext, key)
+
+        # TODO: It seems like might be able to do better than just
+        # brute-forcing all possible seeds. We can recover the last
+        # len(known_plaintext) bytes of the keystream by xor'ing the ciphertext
+        # against the known plaintext. Untempering those values gives you part
+        # of the PRNG internal state. Can you recover the original seed from
+        # this data?
+        for seed in range(0xffff + 1):
+            decrypted = twister_decrypt(ciphertext, seed)
+            if decrypted.endswith(known_plaintext):
+                break
+
+        self.assertEqual(key, seed)
+
+        # TODO: I don't understand the password reset token part of the
+        # challenge. This seems exactly the same as challenge 22?
+        start = int(time.time())
+
+        token = password_reset_token()
+        end = int(time.time())
+        is_token_seeded_with_current_time = False
+        for seed in range(start, end + 1):
+            val = MT19937(seed).next()
+            if hex(val) == token:
+                is_token_seeded_with_current_time = True
+                break
+
+        self.assertTrue(is_token_seeded_with_current_time)
