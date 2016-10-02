@@ -4,6 +4,7 @@ import convert
 import crypto
 import bitops
 import urllib
+import string
 
 
 def edit(ciphertext, key, nonce, offset, plaintext):
@@ -13,6 +14,9 @@ def edit(ciphertext, key, nonce, offset, plaintext):
         + orig_plaintext[offset + len(plaintext):]
     )
     return crypto.ctr_encrypt(new_plaintext, key, nonce)
+
+def encrypt_url(content, key):
+    return crypto.cbc_encrypt(full_content, key, key)
 
 def encrypt_kvps(content, key, nonce):
     full_content = (
@@ -25,6 +29,31 @@ def encrypt_kvps(content, key, nonce):
 
 def is_admin(ciphertext, key, nonce):
     decrypted = crypto.ctr_decrypt(ciphertext, key, nonce)
+    return ';admin=true;' in decrypted
+
+def encrypt_kvps(content, key, nonce):
+    full_content = (
+        'comment1=cooking%20MCs;userdata='
+        + urllib.quote(content)
+        + ';comment2=%20like%20a%20pound%20of%20bacon'
+    )
+
+    return crypto.ctr_encrypt(full_content, key, nonce)
+
+def encrypt_kvps_cbc(content, key):
+    full_content = (
+        'comment1=cooking%20MCs;userdata='
+        + urllib.quote(content)
+        + ';comment2=%20like%20a%20pound%20of%20bacon'
+    )
+
+    return crypto.cbc_encrypt(full_content, key, key)
+
+def is_admin_cbc(ciphertext, key):
+    decrypted = crypto.cbc_decrypt(ciphertext, key, key)
+    if not all(ord(c) < 128 for c in decrypted):
+        raise ValueError('Invalid message ' + decrypted)
+
     return ';admin=true;' in decrypted
 
 class TestSet4(unittest.TestCase):
@@ -86,3 +115,32 @@ class TestSet4(unittest.TestCase):
         )
 
         self.assertTrue(is_admin(tampered_ciphertext, key, nonce))
+
+    def test_challenge27(self):
+        key = crypto.encryption_key()
+        ciphertext = encrypt_kvps_cbc('hello', key)
+
+        tampered = (
+            ciphertext[:16]
+            + ('\x00' * 16)
+            + ciphertext[:16]
+            + ciphertext[16:]
+        )
+
+        try:
+            is_admin_cbc(tampered, key)
+        except ValueError as e:
+            expected_prefix = 'Invalid message '
+            plaintext = e.message[len(expected_prefix):]
+
+        # C1 = 0
+        # P2 = D(E(P0 ^ IV)) ^ C1
+        # P2 = P0 ^ IV ^ 0
+        # P2 = P0 ^ IV
+        # The first block in the recovered plaintext is P0 and iv = key so:
+        # P0 ^ P2 = IV = KEY
+        #
+        # The 3rd plaintext block is
+        # D(E(P0 ^ IV)) ^ 0
+        recovered_key = bitops.xor(plaintext[:16], plaintext[32:48])
+        self.assertEqual(key, recovered_key)
