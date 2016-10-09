@@ -5,7 +5,7 @@ import crypto
 import bitops
 import urllib
 import string
-
+import sha1
 
 def edit(ciphertext, key, nonce, offset, plaintext):
     orig_plaintext = crypto.ctr_decrypt(ciphertext, key, nonce)
@@ -144,3 +144,17 @@ class TestSet4(unittest.TestCase):
         # D(E(P0 ^ IV)) ^ 0
         recovered_key = bitops.xor(plaintext[:16], plaintext[32:48])
         self.assertEqual(key, recovered_key)
+
+    def test_challenge28(self):
+        secret_key = 'YELLOW SUBMARINE'
+
+        message = 'goodbye cruel world'
+        orig_signature = crypto.sha1_keyed_mac(secret_key, message)
+
+        tampered_message = message + 's'
+
+        new_signature = crypto.sha1_keyed_mac(secret_key, tampered_message)
+        self.assertNotEqual(orig_signature, new_signature)
+
+        new_signature = crypto.sha1_keyed_mac('guessed_key', message)
+        self.assertNotEqual(orig_signature, new_signature)
