@@ -1,7 +1,7 @@
 import string
 import math
 import itertools
-from bitops import xor
+from bitops import xor, to_bytes_be
 from collections import Counter
 
 
@@ -237,3 +237,14 @@ def invert_left_shift(v, bits, magic):
         u |= (v ^ ((u << bits) & magic)) & mask
 
     return u
+
+def sha1_padding(message_length_bytes):
+    padding = '\x80'
+
+    padding_length = ((56 - (message_length_bytes + 1) % 64) % 64)
+    padding += '\x00' * padding_length
+
+    message_length_bits = message_length_bytes * 8
+    padding += to_bytes_be(message_length_bits, 8)
+
+    return padding

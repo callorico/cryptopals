@@ -6,6 +6,9 @@ import bitops
 import urllib
 import string
 import sha1
+import crack
+import random
+import os
 
 def edit(ciphertext, key, nonce, offset, plaintext):
     orig_plaintext = crypto.ctr_decrypt(ciphertext, key, nonce)
@@ -55,6 +58,10 @@ def is_admin_cbc(ciphertext, key):
         raise ValueError('Invalid message ' + decrypted)
 
     return ';admin=true;' in decrypted
+
+def validate_mac(key, message, mac):
+    if crypto.sha1_keyed_mac(key, message) != mac:
+        raise ValueError('MAC validation failed')
 
 class TestSet4(unittest.TestCase):
 
@@ -158,3 +165,44 @@ class TestSet4(unittest.TestCase):
 
         new_signature = crypto.sha1_keyed_mac('guessed_key', message)
         self.assertNotEqual(orig_signature, new_signature)
+
+    def test_challenge29(self):
+        secret_key = os.urandom(random.randint(0, 20))
+
+        # Server returns the message and mac to the attacker
+        message = 'comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon'
+        mac = crypto.sha1_keyed_mac(secret_key, message)
+
+        raw = convert.hex_to_bytes(mac)
+        state = (
+            bitops.from_bytes_be(raw[0:4]),
+            bitops.from_bytes_be(raw[4:8]),
+            bitops.from_bytes_be(raw[8:12]),
+            bitops.from_bytes_be(raw[12:16]),
+            bitops.from_bytes_be(raw[16:20]),
+        )
+
+        for guessed_key_length in xrange(1, 100):
+            orig_message_length = guessed_key_length + len(message)
+            padding = crack.sha1_padding(orig_message_length)
+
+            # Attacker sets up a sha1 hash that is in the same state after
+            # hashing secret_key + message + padding
+
+            hasher = sha1.Sha1Hash()
+            hasher._h = state
+            hasher._message_byte_length = orig_message_length + len(padding)
+
+            suffix = ';user=admin'
+            falsified_mac = hasher.update(suffix).hexdigest()
+            falsified_data = message + padding + suffix
+
+            try:
+                # Check to see if the server accepts the falsified data and MAC
+                validate_mac(secret_key, falsified_data, falsified_mac)
+                break
+            except ValueError:
+                # Guessed key length was wrong. Keep going...
+                pass
+
+        self.assertEqual(len(secret_key), guessed_key_length)

@@ -5,7 +5,7 @@ import random
 import sha1
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
-from bitops import xor, to_bytes
+from bitops import xor, to_bytes_le
 
 
 class PaddingError(Exception):
@@ -101,7 +101,7 @@ ctr_decrypt = ctr_convert
 
 def _ctr_keystream(key, nonce):
     for counter in itertools.count():
-        plaintext = nonce + to_bytes(counter, 8)
+        plaintext = nonce + to_bytes_le(counter, 8)
         assert len(plaintext) == 16
         yield ecb_encrypt(plaintext, key)
 
