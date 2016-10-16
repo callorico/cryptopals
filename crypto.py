@@ -3,6 +3,8 @@ import itertools
 import myrandom
 import random
 import sha1
+import md4
+import convert
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from bitops import xor, to_bytes_le
@@ -118,3 +120,8 @@ twister_decrypt = twister_convert
 
 def sha1_keyed_mac(key, message):
     return sha1.sha1(key + message)
+
+def md4_keyed_mac(key, message):
+    hasher = md4.MD4()
+    hasher.add(key + message)
+    return convert.bytes_to_hex(hasher.finish())

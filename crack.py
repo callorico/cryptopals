@@ -1,7 +1,7 @@
 import string
 import math
 import itertools
-from bitops import xor, to_bytes_be
+from bitops import xor, to_bytes_be, to_bytes_le
 from collections import Counter
 
 
@@ -241,10 +241,33 @@ def invert_left_shift(v, bits, magic):
 def sha1_padding(message_length_bytes):
     padding = '\x80'
 
-    padding_length = ((56 - (message_length_bytes + 1) % 64) % 64)
+    padding_length = _zero_byte_length(message_length_bytes + 1, 64, 8)
     padding += '\x00' * padding_length
 
     message_length_bits = message_length_bytes * 8
     padding += to_bytes_be(message_length_bits, 8)
 
     return padding
+
+def md4_padding(message_length_bytes):
+    padding = '\x80'
+
+    padding_length = _zero_byte_length(message_length_bytes + 1, 64, 8)
+    padding += '\x00' * padding_length
+
+    message_length_bits = message_length_bytes * 8
+    padding += to_bytes_le(message_length_bits, 8)
+
+    return padding
+
+def _zero_byte_length(message_length_bytes, block_size, reserve):
+    padding_length = block_size - (message_length_bytes % block_size)
+    if padding_length >= reserve:
+        padding_length -= reserve
+    else:
+        # Not enough room for the final reserve bytes. Extend the padding to
+        # the next block
+        padding_length += (block_size - reserve)
+
+    return padding_length
+

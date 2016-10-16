@@ -6,6 +6,7 @@ import bitops
 import urllib
 import string
 import sha1
+import md4
 import crack
 import random
 import os
@@ -59,8 +60,8 @@ def is_admin_cbc(ciphertext, key):
 
     return ';admin=true;' in decrypted
 
-def validate_mac(key, message, mac):
-    if crypto.sha1_keyed_mac(key, message) != mac:
+def validate_mac(key, message, mac, hasher):
+    if hasher(key, message) != mac:
         raise ValueError('MAC validation failed')
 
 class TestSet4(unittest.TestCase):
@@ -167,7 +168,7 @@ class TestSet4(unittest.TestCase):
         self.assertNotEqual(orig_signature, new_signature)
 
     def test_challenge29(self):
-        secret_key = os.urandom(random.randint(0, 20))
+        secret_key = os.urandom(random.randint(1, 20))
 
         # Server returns the message and mac to the attacker
         message = 'comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon'
@@ -199,7 +200,57 @@ class TestSet4(unittest.TestCase):
 
             try:
                 # Check to see if the server accepts the falsified data and MAC
-                validate_mac(secret_key, falsified_data, falsified_mac)
+                validate_mac(
+                    secret_key,
+                    falsified_data,
+                    falsified_mac,
+                    crypto.sha1_keyed_mac
+                )
+                break
+            except ValueError:
+                # Guessed key length was wrong. Keep going...
+                pass
+
+        self.assertEqual(len(secret_key), guessed_key_length)
+
+    def test_challenge30(self):
+        secret_key = os.urandom(random.randint(1, 20))
+
+        # Server returns the message and mac to the attacker
+        message = 'comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon'
+        mac = crypto.md4_keyed_mac(secret_key, message)
+
+        raw = convert.hex_to_bytes(mac)
+        state = [
+            bitops.from_bytes_le(raw[0:4]),
+            bitops.from_bytes_le(raw[4:8]),
+            bitops.from_bytes_le(raw[8:12]),
+            bitops.from_bytes_le(raw[12:16]),
+        ]
+
+        for guessed_key_length in xrange(1, 100):
+            orig_message_length = guessed_key_length + len(message)
+            padding = crack.md4_padding(orig_message_length)
+
+            # Attacker sets up a md4 hash that is in the same state after
+            # hashing secret_key + message + padding
+
+            hasher = md4.MD4()
+            hasher.h = list(state)
+            hasher.count = (orig_message_length + len(padding)) / 64
+
+            suffix = ';user=admin'
+            falsified_mac = convert.bytes_to_hex(hasher.add(suffix).finish())
+            falsified_data = message + padding + suffix
+
+            try:
+                # Check to see if the server accepts the falsified data and MAC
+                validate_mac(
+                    secret_key,
+                    falsified_data,
+                    falsified_mac,
+                    crypto.md4_keyed_mac
+                )
                 break
             except ValueError:
                 # Guessed key length was wrong. Keep going...
