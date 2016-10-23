@@ -1,7 +1,10 @@
 import os
 
+def abs_path(filename):
+    return os.path.join(os.path.dirname(__file__), 'data', filename)
+
 def readlines(filename):
-    path = os.path.join(os.path.dirname(__file__), 'data', filename)
+    path = abs_path(filename)
 
     with open(path, 'r') as f:
         for line in f:

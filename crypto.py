@@ -125,3 +125,18 @@ def md4_keyed_mac(key, message):
     hasher = md4.MD4()
     hasher.add(key + message)
     return convert.bytes_to_hex(hasher.finish())
+
+def hmac(key, message):
+    padding_length = sha1.Sha1Hash.block_size - len(key)
+    if padding_length > 0:
+        key += '\x00' * padding_length
+    else:
+        key = sha1.Sha1Hash().update(key).digest()
+
+    full_message = (
+        xor(key, '\x5c' * len(key))
+        + sha1.Sha1Hash().update(xor(key, '\x36' * len(key))).digest()
+        + message
+    )
+
+    return sha1.Sha1Hash().update(full_message).digest()
