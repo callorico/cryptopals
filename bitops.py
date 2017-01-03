@@ -41,7 +41,7 @@ def twiddle_bits(mask, actual_char, target_char):
 
     return chr(mask_bits_to_keep | mask_bits_to_flip)
 
-def to_bytes_le(number, length):
+def to_bytes_le(number, length=0):
     """Returns a bytestring with the little-endian representation of the
     specified number that is zero-padded to the desired length.
     """
@@ -55,7 +55,7 @@ def to_bytes_le(number, length):
 
     return bytestring
 
-def to_bytes_be(number, length):
+def to_bytes_be(number, length=0):
     """Returns a bytestring with the big-endian representation of the
     specified number that is zero-padded to the desired length.
     """
